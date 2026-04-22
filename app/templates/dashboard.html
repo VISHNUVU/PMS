@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Welcome back, {{ user.full_name }}</p>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon blue">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <div class="stat-body">
+      <span class="stat-value">{{ projects | length }}</span>
+      <span class="stat-label">Active Projects</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </div>
+    <div class="stat-body">
+      <span class="stat-value">{{ total_tasks }}</span>
+      <span class="stat-label">Total Tasks</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </div>
+    <div class="stat-body">
+      <span class="stat-value">{{ done_tasks }}</span>
+      <span class="stat-label">Completed</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+    </div>
+    <div class="stat-body">
+      <span class="stat-value">{{ members_count }}</span>
+      <span class="stat-label">{% if user.role == 'admin' %}Members{% else %}My Projects{% endif %}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Progress bar -->
+{% if total_tasks > 0 %}
+<div class="card progress-card">
+  <div class="progress-header">
+    <span class="progress-label">Overall Task Completion</span>
+    <span class="progress-pct">{{ progress }}%</span>
+  </div>
+  <div class="progress-bar-track">
+    <div class="progress-bar-fill" style="width: {{ progress }}%"></div>
+  </div>
+</div>
+{% endif %}
+
+<div class="two-col">
+  <!-- Projects list -->
+  <div>
+    <div class="section-header">
+      <h2 class="section-title">Projects</h2>
+      <a href="/projects" class="link-sm">View all</a>
+    </div>
+    {% if projects %}
+    <div class="card-list">
+      {% for p in projects[:5] %}
+      <a href="/projects/{{ p.id }}" class="project-row">
+        <div class="project-row-dot {{ p.status.value }}"></div>
+        <div class="project-row-body">
+          <span class="project-row-name">{{ p.name }}</span>
+          <span class="project-row-meta">{{ p.tasks | length }} tasks &bull; {{ p.status.value | replace('_', ' ') | title }}</span>
+        </div>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">No projects yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Recent tasks -->
+  <div>
+    <div class="section-header">
+      <h2 class="section-title">Recent Tasks</h2>
+    </div>
+    {% if recent_tasks %}
+    <div class="card-list">
+      {% for t in recent_tasks %}
+      <div class="task-row">
+        <span class="badge priority-{{ t.priority.value }}">{{ t.priority.value }}</span>
+        <div class="task-row-body">
+          <span class="task-row-title">{{ t.title }}</span>
+          <span class="task-row-meta">{{ t.project.name }}</span>
+        </div>
+        <span class="badge status-{{ t.status.value }}">{{ t.status.value | replace('_',' ') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">No tasks yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

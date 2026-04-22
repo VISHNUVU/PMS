@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <a href="/projects" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Projects
+    </a>
+    <h1 class="page-title">{{ project.name }}</h1>
+    {% if project.description %}
+    <p class="page-subtitle">{{ project.description }}</p>
+    {% endif %}
+  </div>
+  <div class="header-actions">
+    <span class="badge status-{{ project.status.value }} badge-lg">{{ project.status.value | title }}</span>
+    <button class="btn btn-primary" onclick="openModal('modal-create-task')">+ Add Task</button>
+    {% if user.role == 'admin' %}
+    <button class="btn btn-ghost" onclick="openModal('modal-project-settings')">Settings</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Members strip -->
+<div class="members-strip card">
+  <span class="members-strip-label">Team</span>
+  <div class="members-strip-avatars">
+    {% for m in members %}
+    <div class="avatar-circle" title="{{ m.full_name }}">{{ m.full_name[0] | upper }}</div>
+    {% endfor %}
+  </div>
+  {% if user.role == 'admin' %}
+  <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-member')">+ Add Member</button>
+  {% endif %}
+  {% if project.deadline %}
+  <span class="deadline-chip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Due {{ project.deadline.strftime('%d %b %Y') }}
+  </span>
+  {% endif %}
+</div>
+
+<!-- Kanban board -->
+<div class="kanban">
+  <!-- To Do -->
+  <div class="kanban-col">
+    <div class="kanban-col-header">
+      <span class="kanban-col-title">To Do</span>
+      <span class="kanban-count">{{ todo_tasks | length }}</span>
+    </div>
+    <div class="kanban-cards">
+      {% for t in todo_tasks %}
+      {% include "partials/task_card.html" %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- In Progress -->
+  <div class="kanban-col">
+    <div class="kanban-col-header">
+      <span class="kanban-col-title">In Progress</span>
+      <span class="kanban-count inprogress">{{ inprogress_tasks | length }}</span>
+    </div>
+    <div class="kanban-cards">
+      {% for t in inprogress_tasks %}
+      {% include "partials/task_card.html" %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Done -->
+  <div class="kanban-col">
+    <div class="kanban-col-header">
+      <span class="kanban-col-title">Done</span>
+      <span class="kanban-count done">{{ done_tasks | length }}</span>
+    </div>
+    <div class="kanban-cards">
+      {% for t in done_tasks %}
+      {% include "partials/task_card.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Create Task Modal -->
+<div id="modal-create-task" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">New Task</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/projects/{{ project.id }}/tasks/create">
+    <div class="form-group">
+      <label class="form-label">Title <span class="required">*</span></label>
+      <input type="text" name="title" class="form-input" placeholder="Task title" required />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-input" rows="3" placeholder="Details..."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select name="priority" class="form-input">
+          {% for p in priorities %}
+          <option value="{{ p }}" {% if p == 'medium' %}selected{% endif %}>{{ p | title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input type="date" name="due_date" class="form-input" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Assign To</label>
+      <select name="assigned_to" class="form-input">
+        <option value="">Unassigned</option>
+        {% for m in members %}
+        <option value="{{ m.id }}">{{ m.full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create Task</button>
+    </div>
+  </form>
+</div>
+
+<!-- Add Member Modal (admin) -->
+{% if user.role == 'admin' %}
+<div id="modal-add-member" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">Add Member</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/projects/{{ project.id }}/add-member">
+    <div class="form-group">
+      <label class="form-label">Select Member</label>
+      <select name="user_id" class="form-input" required>
+        {% for u in all_users %}
+        {% if u not in members %}
+        <option value="{{ u.id }}">{{ u.full_name }} ({{ u.username }})</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</div>
+
+<!-- Project Settings Modal (admin) -->
+<div id="modal-project-settings" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">Project Settings</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/projects/{{ project.id }}/update-status">
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select name="status" class="form-input">
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if s == project.status.value %}selected{% endif %}>{{ s | title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}

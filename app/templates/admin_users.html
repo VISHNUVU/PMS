@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Members — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Members</h1>
+    <p class="page-subtitle">{{ users | length }} total user{% if users | length != 1 %}s{% endif %}</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('modal-create-user')">+ Add Member</button>
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Member</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="{% if not u.is_active %}row-inactive{% endif %}">
+        <td>
+          <div class="table-user">
+            <div class="avatar-circle sm">{{ u.full_name[0] | upper }}</div>
+            <span>{{ u.full_name }}</span>
+          </div>
+        </td>
+        <td><code>{{ u.username }}</code></td>
+        <td>{{ u.email }}</td>
+        <td>
+          <span class="badge role-{{ u.role.value }}">{{ u.role.value | title }}</span>
+        </td>
+        <td>
+          {% if u.is_active %}
+          <span class="badge status-active">Active</span>
+          {% else %}
+          <span class="badge status-archived">Inactive</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="row-actions">
+            {% if u.id != user.id %}
+            <form method="POST" action="/admin/users/{{ u.id }}/toggle">
+              <button type="submit" class="btn btn-ghost btn-sm">
+                {{ 'Deactivate' if u.is_active else 'Activate' }}
+              </button>
+            </form>
+            {% endif %}
+            <button class="btn btn-ghost btn-sm" onclick="openResetModal({{ u.id }}, '{{ u.full_name }}')">Reset PW</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Create User Modal -->
+<div id="modal-create-user" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">Add Member</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/admin/users/create">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Full Name <span class="required">*</span></label>
+        <input type="text" name="full_name" class="form-input" placeholder="Jane Smith" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Username <span class="required">*</span></label>
+        <input type="text" name="username" class="form-input" placeholder="jsmith" required />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email <span class="required">*</span></label>
+      <input type="email" name="email" class="form-input" placeholder="jane@eatonbusiness.edu" required />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Password <span class="required">*</span></label>
+        <input type="password" name="password" class="form-input" placeholder="Strong password" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select name="role" class="form-input">
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create Member</button>
+    </div>
+  </form>
+</div>
+
+<!-- Reset Password Modal -->
+<div id="modal-reset-pw" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">Reset Password</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <p class="modal-desc">Setting new password for <strong id="reset-user-name"></strong></p>
+  <form id="reset-pw-form" method="POST">
+    <div class="form-group">
+      <label class="form-label">New Password <span class="required">*</span></label>
+      <input type="password" name="new_password" class="form-input" placeholder="New password" required />
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Reset</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

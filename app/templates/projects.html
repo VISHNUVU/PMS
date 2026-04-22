@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Projects — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Projects</h1>
+    <p class="page-subtitle">{{ projects | length }} project{% if projects | length != 1 %}s{% endif %}</p>
+  </div>
+  {% if user.role == 'admin' %}
+  <button class="btn btn-primary" onclick="openModal('modal-create-project')">+ New Project</button>
+  {% endif %}
+</div>
+
+{% if projects %}
+<div class="projects-grid">
+  {% for p in projects %}
+  <a href="/projects/{{ p.id }}" class="project-card">
+    <div class="project-card-header">
+      <div class="project-card-icon">{{ p.name[0] | upper }}</div>
+      <span class="badge status-{{ p.status.value }}">{{ p.status.value | title }}</span>
+    </div>
+    <h3 class="project-card-name">{{ p.name }}</h3>
+    <p class="project-card-desc">{{ p.description or 'No description provided.' }}</p>
+    <div class="project-card-footer">
+      <span class="meta-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        {{ p.tasks | length }} tasks
+      </span>
+      <span class="meta-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        {{ p.members | length }} members
+      </span>
+      {% if p.deadline %}
+      <span class="meta-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        {{ p.deadline.strftime('%d %b %Y') }}
+      </span>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-page">
+  <div class="empty-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+  </div>
+  <p>No projects yet.{% if user.role == 'admin' %} Create the first one!{% endif %}</p>
+</div>
+{% endif %}
+
+<!-- Create Project Modal (admin only) -->
+{% if user.role == 'admin' %}
+<div id="modal-create-project" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">New Project</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/projects/create">
+    <div class="form-group">
+      <label class="form-label">Project Name <span class="required">*</span></label>
+      <input type="text" name="name" class="form-input" placeholder="e.g. MBA Research Initiative" required />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-input" rows="3" placeholder="Brief description..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Deadline</label>
+      <input type="date" name="deadline" class="form-input" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Add Members</label>
+      <div class="checkbox-list">
+        {% for u in all_users %}
+        <label class="checkbox-item">
+          <input type="checkbox" name="member_ids" value="{{ u.id }}" />
+          <span>{{ u.full_name }} <em>({{ u.username }})</em></span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create Project</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}
