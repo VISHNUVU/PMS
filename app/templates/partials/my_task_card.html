@@ -1,0 +1,18 @@
+<a href="/tasks/{{ t.id }}" class="my-task-card {% if t.due_date and t.due_date < now and t.status.value != 'done' %}task-card-overdue{% endif %}">
+  <div class="my-task-card-top">
+    <span class="badge priority-{{ t.priority.value }}">{{ t.priority.value | title }}</span>
+    <span class="badge status-{{ t.status.value }}">{{ t.status.value | replace('_',' ') }}</span>
+  </div>
+  <h4 class="my-task-title">{{ t.title }}</h4>
+  <div class="my-task-meta">
+    <span class="my-task-project">📁 {{ t.project.name }}</span>
+    {% if t.due_date %}
+    <span class="{% if t.due_date < now and t.status.value != 'done' %}text-red{% endif %}">
+      📅 {{ t.due_date.strftime('%d %b %Y') }}
+    </span>
+    {% endif %}
+    {% if t.comments | length > 0 %}
+    <span>💬 {{ t.comments | length }}</span>
+    {% endif %}
+  </div>
+</a>

@@ -7,6 +7,7 @@ from app.database import engine, SessionLocal
 from app.models import Base, User, UserRole
 from app.auth import hash_password
 from app.routers import auth_router, projects, admin
+from app.routers import tasks_detail, my_tasks, profile, reports, search
 
 app = FastAPI(title="EBS Project Management System", docs_url=None, redoc_url=None)
 
@@ -16,6 +17,11 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(auth_router.router)
 app.include_router(projects.router)
 app.include_router(admin.router)
+app.include_router(tasks_detail.router)
+app.include_router(my_tasks.router)
+app.include_router(profile.router)
+app.include_router(reports.router)
+app.include_router(search.router)
 
 
 @app.on_event("startup")
@@ -29,14 +35,13 @@ def _seed_admin():
     try:
         admin_username = os.getenv("ADMIN_USERNAME", "admin")
         if not db.query(User).filter(User.username == admin_username).first():
-            admin_user = User(
+            db.add(User(
                 username=admin_username,
                 full_name="EBS Administrator",
                 email=os.getenv("ADMIN_EMAIL", "admin@eatonbusiness.edu"),
-                password_hash=hash_password(os.getenv("ADMIN_PASSWORD", "Admin@EBS2024!")),
+                password_hash=hash_password(os.getenv("ADMIN_PASSWORD", "AdminEBS2024")),
                 role=UserRole.admin,
-            )
-            db.add(admin_user)
+            ))
             db.commit()
     finally:
         db.close()

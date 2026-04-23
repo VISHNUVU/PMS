@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}My Tasks — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">My Tasks</h1>
+    <p class="page-subtitle">{{ tasks | length }} task{% if tasks | length != 1 %}s{% endif %} assigned to you</p>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="stat-card">
+    <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ todo | length }}</span><span class="stat-label">To Do</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ in_progress | length }}</span><span class="stat-label">In Progress</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ done | length }}</span><span class="stat-label">Done</span></div>
+  </div>
+  <div class="stat-card {% if overdue %}stat-card-warn{% endif %}">
+    <div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ overdue | length }}</span><span class="stat-label">Overdue</span></div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="task-filters">
+  <span class="filter-label">Filter:</span>
+  <select onchange="applyFilter(this,'status')" class="filter-select">
+    <option value="">All Status</option>
+    {% for s in statuses %}<option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s | replace('_',' ') | title }}</option>{% endfor %}
+  </select>
+  <select onchange="applyFilter(this,'priority')" class="filter-select">
+    <option value="">All Priority</option>
+    {% for p in priorities %}<option value="{{ p }}" {% if priority_filter == p %}selected{% endif %}>{{ p | title }}</option>{% endfor %}
+  </select>
+  {% if status_filter or priority_filter %}
+  <a href="/my-tasks" class="btn btn-ghost btn-sm">Clear</a>
+  {% endif %}
+</div>
+
+{% if overdue and not status_filter %}
+<div class="overdue-section">
+  <div class="section-header"><h2 class="section-title text-red">⚠ Overdue ({{ overdue | length }})</h2></div>
+  <div class="task-list-cards">
+    {% for t in overdue %}{% include "partials/my_task_card.html" %}{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if tasks %}
+<div class="mytasks-cols">
+  <div>
+    <div class="section-header"><h2 class="section-title">To Do</h2></div>
+    <div class="task-list-cards">
+      {% for t in todo %}{% include "partials/my_task_card.html" %}{% endfor %}
+      {% if not todo %}<div class="empty-state">Nothing to do 🎉</div>{% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="section-header"><h2 class="section-title">In Progress</h2></div>
+    <div class="task-list-cards">
+      {% for t in in_progress %}{% include "partials/my_task_card.html" %}{% endfor %}
+      {% if not in_progress %}<div class="empty-state">Nothing in progress</div>{% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="section-header"><h2 class="section-title">Done</h2></div>
+    <div class="task-list-cards">
+      {% for t in done %}{% include "partials/my_task_card.html" %}{% endfor %}
+      {% if not done %}<div class="empty-state">Nothing completed yet</div>{% endif %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="empty-page">
+  <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+  <p>No tasks assigned to you yet.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+function applyFilter(el, param) {
+  const url = new URL(window.location.href);
+  if (el.value) url.searchParams.set(param, el.value);
+  else url.searchParams.delete(param);
+  window.location.href = url.toString();
+}
+</script>
+{% endblock %}

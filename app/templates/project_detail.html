@@ -5,83 +5,203 @@
 <div class="page-header">
   <div>
     <a href="/projects" class="back-link">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-      Projects
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>Projects
     </a>
     <h1 class="page-title">{{ project.name }}</h1>
-    {% if project.description %}
-    <p class="page-subtitle">{{ project.description }}</p>
-    {% endif %}
+    {% if project.description %}<p class="page-subtitle">{{ project.description }}</p>{% endif %}
   </div>
   <div class="header-actions">
     <span class="badge status-{{ project.status.value }} badge-lg">{{ project.status.value | title }}</span>
     <button class="btn btn-primary" onclick="openModal('modal-create-task')">+ Add Task</button>
     {% if user.role == 'admin' %}
-    <button class="btn btn-ghost" onclick="openModal('modal-project-settings')">Settings</button>
+    <div class="dropdown" id="proj-dropdown">
+      <button class="btn btn-ghost" onclick="toggleDropdown('proj-dropdown')">⋯</button>
+      <div class="dropdown-menu">
+        <a class="dropdown-item" onclick="openModal('modal-edit-project')">Edit Project</a>
+        <a class="dropdown-item" onclick="openModal('modal-project-status')">Change Status</a>
+        <a class="dropdown-item text-red" onclick="confirmDelete()">Delete Project</a>
+      </div>
+    </div>
     {% endif %}
   </div>
 </div>
 
+<!-- Stats strip -->
+<div class="project-stats-strip">
+  <div class="pstat"><span class="pstat-val">{{ stats.total }}</span><span class="pstat-label">Tasks</span></div>
+  <div class="pstat"><span class="pstat-val text-green">{{ stats.done }}</span><span class="pstat-label">Done</span></div>
+  <div class="pstat"><span class="pstat-val text-blue">{{ stats.total - stats.done }}</span><span class="pstat-label">Remaining</span></div>
+  {% if stats.overdue > 0 %}
+  <div class="pstat"><span class="pstat-val text-red">{{ stats.overdue }}</span><span class="pstat-label">Overdue</span></div>
+  {% endif %}
+  <div class="pstat pstat-progress">
+    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:{{ stats.progress }}%"></div></div>
+    <span class="pstat-label">{{ stats.progress }}% complete</span>
+  </div>
+  {% if project.deadline %}
+  <div class="pstat">
+    <span class="pstat-val {% if project.deadline < now %}text-red{% endif %}">{{ project.deadline.strftime('%d %b %Y') }}</span>
+    <span class="pstat-label">Deadline</span>
+  </div>
+  {% endif %}
+</div>
+
 <!-- Members strip -->
 <div class="members-strip card">
-  <span class="members-strip-label">Team</span>
+  <span class="members-strip-label">Team ({{ members | length }})</span>
   <div class="members-strip-avatars">
     {% for m in members %}
-    <div class="avatar-circle" title="{{ m.full_name }}">{{ m.full_name[0] | upper }}</div>
+    <div class="avatar-circle" title="{{ m.full_name }}">
+      {{ m.full_name[0] | upper }}
+      {% if user.role == 'admin' and m.id != user.id %}
+      <form method="POST" action="/projects/{{ project.id }}/remove-member/{{ m.id }}" class="remove-member-form">
+        <button type="submit" class="remove-member-btn" title="Remove {{ m.full_name }}" onclick="return confirm('Remove {{ m.full_name }} from this project?')">×</button>
+      </form>
+      {% endif %}
+    </div>
     {% endfor %}
   </div>
-  {% if user.role == 'admin' %}
-  <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-member')">+ Add Member</button>
-  {% endif %}
-  {% if project.deadline %}
-  <span class="deadline-chip">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-    Due {{ project.deadline.strftime('%d %b %Y') }}
-  </span>
+  {% if user.role == 'admin' and non_members %}
+  <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-member')">+ Member</button>
   {% endif %}
 </div>
 
-<!-- Kanban board -->
-<div class="kanban">
-  <!-- To Do -->
-  <div class="kanban-col">
+<!-- Filters -->
+<div class="task-filters">
+  <span class="filter-label">Filter:</span>
+  <select onchange="applyFilter(this,'status')" class="filter-select">
+    <option value="">All Status</option>
+    {% for s in statuses %}<option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s | replace('_',' ') | title }}</option>{% endfor %}
+  </select>
+  <select onchange="applyFilter(this,'priority')" class="filter-select">
+    <option value="">All Priority</option>
+    {% for p in priorities %}<option value="{{ p }}" {% if priority_filter == p %}selected{% endif %}>{{ p | title }}</option>{% endfor %}
+  </select>
+  <select onchange="applyFilter(this,'assignee')" class="filter-select">
+    <option value="">All Assignees</option>
+    <option value="me" {% if assignee_filter == 'me' %}selected{% endif %}>Assigned to me</option>
+    <option value="unassigned" {% if assignee_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
+  </select>
+  {% if status_filter or priority_filter or assignee_filter %}
+  <a href="/projects/{{ project.id }}" class="btn btn-ghost btn-sm">Clear</a>
+  {% endif %}
+</div>
+
+<!-- Kanban Board -->
+<div class="kanban" id="kanban-board">
+  {% for col_name, col_tasks, col_status in [('To Do', todo_tasks, 'todo'), ('In Progress', inprogress_tasks, 'in_progress'), ('Done', done_tasks, 'done')] %}
+  <div class="kanban-col" data-status="{{ col_status }}"
+       ondragover="event.preventDefault(); this.classList.add('drag-over')"
+       ondragleave="this.classList.remove('drag-over')"
+       ondrop="dropTask(event, '{{ col_status }}')">
     <div class="kanban-col-header">
-      <span class="kanban-col-title">To Do</span>
-      <span class="kanban-count">{{ todo_tasks | length }}</span>
+      <span class="kanban-col-title">{{ col_name }}</span>
+      <span class="kanban-count {{ col_status }}">{{ col_tasks | length }}</span>
     </div>
     <div class="kanban-cards">
-      {% for t in todo_tasks %}
-      {% include "partials/task_card.html" %}
+      {% for t in col_tasks %}
+      <div class="task-card {% if t.due_date and t.due_date < now and t.status.value != 'done' %}task-card-overdue{% endif %}"
+           draggable="true" data-task-id="{{ t.id }}"
+           ondragstart="dragStart(event, {{ t.id }})">
+        <div class="task-card-top">
+          <span class="badge priority-{{ t.priority.value }}">{{ t.priority.value | title }}</span>
+          <div class="task-card-actions">
+            <a href="/tasks/{{ t.id }}" class="icon-btn" title="View details">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </a>
+            <button class="icon-btn" onclick="openTaskEdit({{ t.id }})" title="Quick edit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
+        </div>
+        <h4 class="task-card-title">{{ t.title }}</h4>
+        {% if t.description %}<p class="task-card-desc">{{ t.description }}</p>{% endif %}
+        <div class="task-card-footer">
+          {% if t.assignee %}
+          <div class="assignee-chip">
+            <div class="avatar-xs">{{ t.assignee.full_name[0] }}</div>
+            <span>{{ t.assignee.full_name.split()[0] }}</span>
+          </div>
+          {% else %}<span class="unassigned">Unassigned</span>{% endif %}
+          <div class="task-card-meta-right">
+            {% if t.comments | length > 0 %}
+            <span class="comment-count">💬 {{ t.comments | length }}</span>
+            {% endif %}
+            {% if t.due_date %}
+            <span class="due-chip {% if t.due_date < now and t.status.value != 'done' %}overdue{% endif %}">
+              {{ t.due_date.strftime('%d %b') }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Quick edit panel -->
+        <div id="task-edit-{{ t.id }}" class="task-inline-modal hidden">
+          <form method="POST" action="/tasks/{{ t.id }}/update">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-input form-input-sm">
+                  <option value="todo" {% if t.status.value=='todo' %}selected{% endif %}>To Do</option>
+                  <option value="in_progress" {% if t.status.value=='in_progress' %}selected{% endif %}>In Progress</option>
+                  <option value="done" {% if t.status.value=='done' %}selected{% endif %}>Done</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Priority</label>
+                <select name="priority" class="form-input form-input-sm">
+                  <option value="low" {% if t.priority.value=='low' %}selected{% endif %}>Low</option>
+                  <option value="medium" {% if t.priority.value=='medium' %}selected{% endif %}>Medium</option>
+                  <option value="high" {% if t.priority.value=='high' %}selected{% endif %}>High</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Assign To</label>
+              <select name="assigned_to" class="form-input form-input-sm">
+                <option value="0">Unassigned</option>
+                {% for m in members %}
+                <option value="{{ m.id }}" {% if t.assigned_to == m.id %}selected{% endif %}>{{ m.full_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="task-modal-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+              <a href="/tasks/{{ t.id }}" class="btn btn-ghost btn-sm">Full Edit</a>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="closeTaskEdit({{ t.id }})">Cancel</button>
+            </div>
+          </form>
+          {% if user.role == 'admin' or t.created_by == user.id %}
+          <form method="POST" action="/tasks/{{ t.id }}/delete" style="margin-top:6px">
+            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this task?')">Delete</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
       {% endfor %}
     </div>
   </div>
+  {% endfor %}
+</div>
 
-  <!-- In Progress -->
-  <div class="kanban-col">
-    <div class="kanban-col-header">
-      <span class="kanban-col-title">In Progress</span>
-      <span class="kanban-count inprogress">{{ inprogress_tasks | length }}</span>
+<!-- Activity Feed -->
+{% if activities %}
+<div style="margin-top:32px">
+  <div class="section-header"><h2 class="section-title">Activity</h2></div>
+  <div class="activity-feed card">
+    {% for a in activities %}
+    <div class="activity-item">
+      <div class="activity-avatar">{{ a.user.full_name[0] }}</div>
+      <div class="activity-body">
+        <span class="activity-name">{{ a.user.full_name }}</span>
+        <span class="activity-action">{{ a.action }}</span>
+      </div>
+      <span class="activity-time">{{ a.created_at.strftime('%d %b, %H:%M') }}</span>
     </div>
-    <div class="kanban-cards">
-      {% for t in inprogress_tasks %}
-      {% include "partials/task_card.html" %}
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- Done -->
-  <div class="kanban-col">
-    <div class="kanban-col-header">
-      <span class="kanban-col-title">Done</span>
-      <span class="kanban-count done">{{ done_tasks | length }}</span>
-    </div>
-    <div class="kanban-cards">
-      {% for t in done_tasks %}
-      {% include "partials/task_card.html" %}
-      {% endfor %}
-    </div>
+    {% endfor %}
   </div>
 </div>
+{% endif %}
 
 <!-- Create Task Modal -->
 <div id="modal-create-task" class="modal hidden">
@@ -92,19 +212,19 @@
   <form method="POST" action="/projects/{{ project.id }}/tasks/create">
     <div class="form-group">
       <label class="form-label">Title <span class="required">*</span></label>
-      <input type="text" name="title" class="form-input" placeholder="Task title" required />
+      <input type="text" name="title" class="form-input" placeholder="Task title" required autofocus />
     </div>
     <div class="form-group">
       <label class="form-label">Description</label>
-      <textarea name="description" class="form-input" rows="3" placeholder="Details..."></textarea>
+      <textarea name="description" class="form-input" rows="3" placeholder="Details…"></textarea>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Priority</label>
         <select name="priority" class="form-input">
-          {% for p in priorities %}
-          <option value="{{ p }}" {% if p == 'medium' %}selected{% endif %}>{{ p | title }}</option>
-          {% endfor %}
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
         </select>
       </div>
       <div class="form-group">
@@ -116,9 +236,7 @@
       <label class="form-label">Assign To</label>
       <select name="assigned_to" class="form-input">
         <option value="">Unassigned</option>
-        {% for m in members %}
-        <option value="{{ m.id }}">{{ m.full_name }}</option>
-        {% endfor %}
+        {% for m in members %}<option value="{{ m.id }}">{{ m.full_name }}</option>{% endfor %}
       </select>
     </div>
     <div class="modal-actions">
@@ -128,8 +246,8 @@
   </form>
 </div>
 
-<!-- Add Member Modal (admin) -->
 {% if user.role == 'admin' %}
+<!-- Add Member Modal -->
 <div id="modal-add-member" class="modal hidden">
   <div class="modal-header">
     <h2 class="modal-title">Add Member</h2>
@@ -139,41 +257,91 @@
     <div class="form-group">
       <label class="form-label">Select Member</label>
       <select name="user_id" class="form-input" required>
-        {% for u in all_users %}
-        {% if u not in members %}
-        <option value="{{ u.id }}">{{ u.full_name }} ({{ u.username }})</option>
-        {% endif %}
-        {% endfor %}
+        {% for u in non_members %}<option value="{{ u.id }}">{{ u.full_name }} ({{ u.username }})</option>{% endfor %}
       </select>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
-      <button type="submit" class="btn btn-primary">Add</button>
+      <button type="submit" class="btn btn-primary">Add Member</button>
     </div>
   </form>
 </div>
 
-<!-- Project Settings Modal (admin) -->
-<div id="modal-project-settings" class="modal hidden">
+<!-- Edit Project Modal -->
+<div id="modal-edit-project" class="modal hidden">
   <div class="modal-header">
-    <h2 class="modal-title">Project Settings</h2>
+    <h2 class="modal-title">Edit Project</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/projects/{{ project.id }}/edit">
+    <div class="form-group">
+      <label class="form-label">Name <span class="required">*</span></label>
+      <input type="text" name="name" class="form-input" value="{{ project.name }}" required />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-input" rows="3">{{ project.description or '' }}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Deadline</label>
+      <input type="date" name="deadline" class="form-input" value="{{ project.deadline.strftime('%Y-%m-%d') if project.deadline else '' }}" />
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+  </form>
+</div>
+
+<!-- Change Status Modal -->
+<div id="modal-project-status" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">Change Status</h2>
     <button class="modal-close" onclick="closeAllModals()">&times;</button>
   </div>
   <form method="POST" action="/projects/{{ project.id }}/update-status">
     <div class="form-group">
       <label class="form-label">Status</label>
       <select name="status" class="form-input">
-        {% for s in statuses %}
+        {% for s in project_statuses %}
         <option value="{{ s }}" {% if s == project.status.value %}selected{% endif %}>{{ s | title }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
-      <button type="submit" class="btn btn-primary">Save</button>
+      <button type="submit" class="btn btn-primary">Update</button>
     </div>
   </form>
 </div>
+
+<!-- Delete form (hidden) -->
+<form id="delete-project-form" method="POST" action="/projects/{{ project.id }}/delete" style="display:none"></form>
 {% endif %}
 
+{% endblock %}
+{% block scripts %}
+<script>
+const PROJECT_ID = {{ project.id }};
+function applyFilter(el, param) {
+  const url = new URL(window.location.href);
+  if (el.value) url.searchParams.set(param, el.value);
+  else url.searchParams.delete(param);
+  window.location.href = url.toString();
+}
+function confirmDelete() {
+  if (confirm('Delete project "{{ project.name }}"? This will remove all tasks and cannot be undone.')) {
+    document.getElementById('delete-project-form').submit();
+  }
+}
+function toggleDropdown(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  document.querySelectorAll('.dropdown.open').forEach(d => {
+    if (!d.contains(e.target)) d.classList.remove('open');
+  });
+});
+</script>
 {% endblock %}

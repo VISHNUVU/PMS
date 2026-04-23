@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Reports — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Reports</h1>
+    <p class="page-subtitle">Overview of all projects and team performance</p>
+  </div>
+</div>
+
+<!-- Top stats -->
+<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="stat-card">
+    <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ total_projects }}</span><span class="stat-label">Total Projects</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ total_tasks }}</span><span class="stat-label">Total Tasks</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ completion_rate }}%</span><span class="stat-label">Completion Rate</span></div>
+  </div>
+  <div class="stat-card {% if task_overdue > 0 %}stat-card-warn{% endif %}">
+    <div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+    <div class="stat-body"><span class="stat-value">{{ task_overdue }}</span><span class="stat-label">Overdue Tasks</span></div>
+  </div>
+</div>
+
+<div class="reports-grid">
+  <!-- Project status breakdown -->
+  <div class="card">
+    <h3 class="card-section-title">Projects by Status</h3>
+    <div class="report-bar-list">
+      <div class="report-bar-item">
+        <span class="report-bar-label">Active</span>
+        <div class="report-bar-track"><div class="report-bar-fill green" style="width:{{ (proj_active / total_projects * 100)|int if total_projects else 0 }}%"></div></div>
+        <span class="report-bar-val">{{ proj_active }}</span>
+      </div>
+      <div class="report-bar-item">
+        <span class="report-bar-label">Completed</span>
+        <div class="report-bar-track"><div class="report-bar-fill blue" style="width:{{ (proj_completed / total_projects * 100)|int if total_projects else 0 }}%"></div></div>
+        <span class="report-bar-val">{{ proj_completed }}</span>
+      </div>
+      <div class="report-bar-item">
+        <span class="report-bar-label">Archived</span>
+        <div class="report-bar-track"><div class="report-bar-fill gray" style="width:{{ (proj_archived / total_projects * 100)|int if total_projects else 0 }}%"></div></div>
+        <span class="report-bar-val">{{ proj_archived }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task breakdown -->
+  <div class="card">
+    <h3 class="card-section-title">Tasks by Status</h3>
+    <div class="report-bar-list">
+      <div class="report-bar-item">
+        <span class="report-bar-label">To Do</span>
+        <div class="report-bar-track"><div class="report-bar-fill gray" style="width:{{ (task_todo / total_tasks * 100)|int if total_tasks else 0 }}%"></div></div>
+        <span class="report-bar-val">{{ task_todo }}</span>
+      </div>
+      <div class="report-bar-item">
+        <span class="report-bar-label">In Progress</span>
+        <div class="report-bar-track"><div class="report-bar-fill orange" style="width:{{ (task_inprogress / total_tasks * 100)|int if total_tasks else 0 }}%"></div></div>
+        <span class="report-bar-val">{{ task_inprogress }}</span>
+      </div>
+      <div class="report-bar-item">
+        <span class="report-bar-label">Done</span>
+        <div class="report-bar-track"><div class="report-bar-fill green" style="width:{{ (task_done / total_tasks * 100)|int if total_tasks else 0 }}%"></div></div>
+        <span class="report-bar-val">{{ task_done }}</span>
+      </div>
+      <div class="report-bar-item">
+        <span class="report-bar-label">Overdue</span>
+        <div class="report-bar-track"><div class="report-bar-fill red" style="width:{{ (task_overdue / total_tasks * 100)|int if total_tasks else 0 }}%"></div></div>
+        <span class="report-bar-val">{{ task_overdue }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Member Workload -->
+<div class="card" style="margin-top:20px">
+  <h3 class="card-section-title">Member Workload</h3>
+  <table class="table">
+    <thead>
+      <tr><th>Member</th><th>Role</th><th>Total</th><th>In Progress</th><th>Done</th><th>Overdue</th><th>Completion</th></tr>
+    </thead>
+    <tbody>
+      {% for s in member_stats %}
+      <tr>
+        <td>
+          <div class="table-user">
+            <div class="avatar-circle sm">{{ s.user.full_name[0] }}</div>
+            {{ s.user.full_name }}
+          </div>
+        </td>
+        <td><span class="badge role-{{ s.user.role.value }}">{{ s.user.role.value | title }}</span></td>
+        <td><strong>{{ s.total }}</strong></td>
+        <td><span class="badge status-in_progress">{{ s.in_progress }}</span></td>
+        <td><span class="badge status-done">{{ s.done }}</span></td>
+        <td>{% if s.overdue > 0 %}<span class="badge priority-high">{{ s.overdue }}</span>{% else %}-{% endif %}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress-bar-track" style="width:80px">
+              <div class="progress-bar-fill" style="width:{{ (s.done / s.total * 100)|int if s.total else 0 }}%"></div>
+            </div>
+            <span>{{ (s.done / s.total * 100)|int if s.total else 0 }}%</span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Project Breakdown -->
+<div class="card" style="margin-top:20px">
+  <h3 class="card-section-title">Project Breakdown</h3>
+  <table class="table">
+    <thead>
+      <tr><th>Project</th><th>Status</th><th>Members</th><th>Tasks</th><th>Done</th><th>Overdue</th><th>Progress</th></tr>
+    </thead>
+    <tbody>
+      {% for s in project_breakdown %}
+      <tr>
+        <td><a href="/projects/{{ s.project.id }}" class="link-blue">{{ s.project.name }}</a></td>
+        <td><span class="badge status-{{ s.project.status.value }}">{{ s.project.status.value | title }}</span></td>
+        <td>{{ s.members }}</td>
+        <td>{{ s.total }}</td>
+        <td><span class="badge status-done">{{ s.done }}</span></td>
+        <td>{% if s.overdue > 0 %}<span class="badge priority-high">{{ s.overdue }}</span>{% else %}-{% endif %}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress-bar-track" style="width:80px"><div class="progress-bar-fill" style="width:{{ s.progress }}%"></div></div>
+            <span>{{ s.progress }}%</span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

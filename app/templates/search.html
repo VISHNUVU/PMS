@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Search — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Search Results</h1>
+    {% if q %}<p class="page-subtitle">{{ total }} result{% if total != 1 %}s{% endif %} for "<strong>{{ q }}</strong>"</p>{% endif %}
+  </div>
+</div>
+
+<form action="/search" method="GET" class="search-page-form">
+  <input type="text" name="q" class="form-input search-big-input" placeholder="Search projects and tasks…" value="{{ q }}" autofocus />
+  <button type="submit" class="btn btn-primary">Search</button>
+</form>
+
+{% if q %}
+  {% if projects_result %}
+  <div class="section-header" style="margin-top:24px"><h2 class="section-title">Projects ({{ projects_result | length }})</h2></div>
+  <div class="projects-grid">
+    {% for p in projects_result %}
+    <a href="/projects/{{ p.id }}" class="project-card">
+      <div class="project-card-header">
+        <div class="project-card-icon">{{ p.name[0] }}</div>
+        <span class="badge status-{{ p.status.value }}">{{ p.status.value | title }}</span>
+      </div>
+      <h3 class="project-card-name">{{ p.name }}</h3>
+      <p class="project-card-desc">{{ p.description or 'No description.' }}</p>
+      <div class="project-card-footer">
+        <span class="meta-item">{{ p.tasks | length }} tasks</span>
+        <span class="meta-item">{{ p.members | length }} members</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if tasks_result %}
+  <div class="section-header" style="margin-top:24px"><h2 class="section-title">Tasks ({{ tasks_result | length }})</h2></div>
+  <div class="card-list">
+    {% for t in tasks_result %}
+    <a href="/tasks/{{ t.id }}" class="task-row">
+      <span class="badge priority-{{ t.priority.value }}">{{ t.priority.value[0].upper() }}</span>
+      <div class="task-row-body">
+        <span class="task-row-title">{{ t.title }}</span>
+        <span class="task-row-meta">{{ t.project.name }} · {{ t.status.value | replace('_',' ') }}</span>
+      </div>
+      <span class="badge status-{{ t.status.value }}">{{ t.status.value | replace('_',' ') }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if total == 0 %}
+  <div class="empty-page">
+    <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+    <p>No results found for "{{ q }}"</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+{% endblock %}

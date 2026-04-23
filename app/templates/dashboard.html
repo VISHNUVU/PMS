@@ -5,11 +5,14 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Dashboard</h1>
-    <p class="page-subtitle">Welcome back, {{ user.full_name }}</p>
+    <p class="page-subtitle">Welcome back, <strong>{{ user.full_name }}</strong></p>
   </div>
+  {% if user.role == 'admin' %}
+  <button class="btn btn-primary" onclick="openModal('modal-create-project')">+ New Project</button>
+  {% endif %}
 </div>
 
-<!-- Stats row -->
+<!-- Stats -->
 <div class="stats-grid">
   <div class="stat-card">
     <div class="stat-icon blue">
@@ -31,84 +34,148 @@
   </div>
   <div class="stat-card">
     <div class="stat-icon green">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
     </div>
     <div class="stat-body">
       <span class="stat-value">{{ done_tasks }}</span>
       <span class="stat-label">Completed</span>
     </div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card {% if overdue_tasks > 0 %}stat-card-warn{% endif %}">
     <div class="stat-icon orange">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     </div>
     <div class="stat-body">
-      <span class="stat-value">{{ members_count }}</span>
-      <span class="stat-label">{% if user.role == 'admin' %}Members{% else %}My Projects{% endif %}</span>
+      <span class="stat-value">{{ overdue_tasks }}</span>
+      <span class="stat-label">Overdue</span>
     </div>
   </div>
 </div>
 
-<!-- Progress bar -->
 {% if total_tasks > 0 %}
 <div class="card progress-card">
   <div class="progress-header">
-    <span class="progress-label">Overall Task Completion</span>
+    <span class="progress-label">Overall Completion</span>
     <span class="progress-pct">{{ progress }}%</span>
   </div>
   <div class="progress-bar-track">
-    <div class="progress-bar-fill" style="width: {{ progress }}%"></div>
+    <div class="progress-bar-fill" style="width:{{ progress }}%"></div>
+  </div>
+  <div class="progress-breakdown">
+    <span>✅ {{ done_tasks }} done</span>
+    <span>🔄 {{ inprogress_tasks }} in progress</span>
+    <span>📋 {{ total_tasks - done_tasks - inprogress_tasks }} to do</span>
   </div>
 </div>
 {% endif %}
 
-<div class="two-col">
-  <!-- Projects list -->
-  <div>
+<div class="dashboard-grid">
+  <!-- Projects -->
+  <div class="dash-col">
     <div class="section-header">
       <h2 class="section-title">Projects</h2>
-      <a href="/projects" class="link-sm">View all</a>
+      <a href="/projects" class="link-sm">View all →</a>
     </div>
     {% if projects %}
     <div class="card-list">
-      {% for p in projects[:5] %}
+      {% for p in projects[:6] %}
+      {% set s = project_stats[p.id] %}
       <a href="/projects/{{ p.id }}" class="project-row">
         <div class="project-row-dot {{ p.status.value }}"></div>
         <div class="project-row-body">
           <span class="project-row-name">{{ p.name }}</span>
-          <span class="project-row-meta">{{ p.tasks | length }} tasks &bull; {{ p.status.value | replace('_', ' ') | title }}</span>
+          <div class="project-row-progress">
+            <div class="mini-bar-track"><div class="mini-bar-fill" style="width:{{ s.progress }}%"></div></div>
+            <span class="project-row-meta">{{ s.done }}/{{ s.total }} · {{ s.progress }}%</span>
+          </div>
         </div>
+        {% if s.overdue > 0 %}<span class="overdue-pip">{{ s.overdue }} overdue</span>{% endif %}
         <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </a>
       {% endfor %}
     </div>
     {% else %}
-    <div class="empty-state">No projects yet.</div>
+    <div class="empty-state">No projects yet.{% if user.role == 'admin' %} <a href="#" onclick="openModal('modal-create-project')">Create one</a>.{% endif %}</div>
     {% endif %}
   </div>
 
-  <!-- Recent tasks -->
-  <div>
+  <!-- My Tasks -->
+  <div class="dash-col">
     <div class="section-header">
-      <h2 class="section-title">Recent Tasks</h2>
+      <h2 class="section-title">My Tasks</h2>
+      <a href="/my-tasks" class="link-sm">View all →</a>
     </div>
-    {% if recent_tasks %}
+    {% if my_tasks %}
     <div class="card-list">
-      {% for t in recent_tasks %}
-      <div class="task-row">
-        <span class="badge priority-{{ t.priority.value }}">{{ t.priority.value }}</span>
+      {% for t in my_tasks %}
+      <a href="/tasks/{{ t.id }}" class="task-row {% if t.due_date and t.due_date < now %}task-overdue{% endif %}">
+        <span class="badge priority-{{ t.priority.value }}">{{ t.priority.value[0].upper() }}</span>
         <div class="task-row-body">
           <span class="task-row-title">{{ t.title }}</span>
-          <span class="task-row-meta">{{ t.project.name }}</span>
+          <span class="task-row-meta">{{ t.project.name }}{% if t.due_date %} · Due {{ t.due_date.strftime('%d %b') }}{% endif %}</span>
         </div>
         <span class="badge status-{{ t.status.value }}">{{ t.status.value | replace('_',' ') }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">No tasks assigned to you.</div>
+    {% endif %}
+  </div>
+
+  <!-- Activity Feed -->
+  <div class="dash-col dash-col-full">
+    <div class="section-header">
+      <h2 class="section-title">Recent Activity</h2>
+    </div>
+    {% if activities %}
+    <div class="activity-feed card">
+      {% for a in activities %}
+      <div class="activity-item">
+        <div class="activity-avatar">{{ a.user.full_name[0] }}</div>
+        <div class="activity-body">
+          <span class="activity-name">{{ a.user.full_name }}</span>
+          <span class="activity-action">{{ a.action }}</span>
+          {% if a.project %}<span class="activity-project">in {{ a.project.name }}</span>{% endif %}
+        </div>
+        <span class="activity-time" title="{{ a.created_at.strftime('%Y-%m-%d %H:%M') }}">
+          {{ a.created_at.strftime('%d %b, %H:%M') }}
+        </span>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <div class="empty-state">No tasks yet.</div>
+    <div class="empty-state">No activity yet.</div>
     {% endif %}
   </div>
 </div>
+
+<!-- Create Project Modal (admin) -->
+{% if user.role == 'admin' %}
+<div id="modal-create-project" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">New Project</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/projects/create">
+    <div class="form-group">
+      <label class="form-label">Project Name <span class="required">*</span></label>
+      <input type="text" name="name" class="form-input" placeholder="e.g. MBA Research Initiative" required />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-input" rows="3" placeholder="Brief description…"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Deadline</label>
+      <input type="date" name="deadline" class="form-input" />
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create Project</button>
+    </div>
+  </form>
+</div>
+{% endif %}
 
 {% endblock %}

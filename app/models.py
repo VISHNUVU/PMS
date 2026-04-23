@@ -44,6 +44,8 @@ class User(Base):
     memberships = relationship("ProjectMember", back_populates="user")
     assigned_tasks = relationship("Task", foreign_keys="Task.assigned_to", back_populates="assignee")
     created_tasks = relationship("Task", foreign_keys="Task.created_by", back_populates="creator")
+    comments = relationship("TaskComment", back_populates="author")
+    activities = relationship("ActivityLog", back_populates="user")
 
 
 class Project(Base):
@@ -56,10 +58,12 @@ class Project(Base):
     deadline = Column(DateTime, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_projects")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    activities = relationship("ActivityLog", back_populates="project", cascade="all, delete-orphan")
 
 
 class ProjectMember(Base):
@@ -93,3 +97,32 @@ class Task(Base):
     project = relationship("Project", back_populates="tasks")
     assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_tasks")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_tasks")
+    comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan", order_by="TaskComment.created_at")
+
+
+class TaskComment(Base):
+    __tablename__ = "task_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    task = relationship("Task", back_populates="comments")
+    author = relationship("User", back_populates="comments")
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String(300), nullable=False)
+    entity_type = Column(String(50))
+    entity_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="activities")
+    project = relationship("Project", back_populates="activities")

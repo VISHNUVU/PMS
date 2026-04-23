@@ -12,7 +12,7 @@
 <body>
   <div class="layout">
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
         <div class="brand-icon">E</div>
         <div class="brand-text">
@@ -21,39 +21,54 @@
         </div>
       </div>
 
+      <!-- Search -->
+      <form action="/search" method="GET" class="sidebar-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" placeholder="Search…" value="{{ request.query_params.get('q','') }}" autocomplete="off" />
+      </form>
+
       <nav class="sidebar-nav">
         <a href="/dashboard" class="nav-item {% if request.url.path == '/dashboard' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           Dashboard
         </a>
-        <a href="/projects" class="nav-item {% if '/projects' in request.url.path %}active{% endif %}">
+        <a href="/projects" class="nav-item {% if '/projects' in request.url.path and '/admin' not in request.url.path %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           Projects
         </a>
+        <a href="/my-tasks" class="nav-item {% if request.url.path == '/my-tasks' %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          My Tasks
+        </a>
+
         {% if user and user.role == 'admin' %}
         <div class="nav-section">Admin</div>
-        <a href="/admin/users" class="nav-item {% if '/admin' in request.url.path %}active{% endif %}">
+        <a href="/admin/users" class="nav-item {% if '/admin/users' in request.url.path %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Members
+        </a>
+        <a href="/reports" class="nav-item {% if '/reports' in request.url.path %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Reports
         </a>
         {% endif %}
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-chip">
+        <a href="/profile" class="user-chip {% if request.url.path == '/profile' %}active{% endif %}">
           <div class="user-avatar">{{ user.full_name[0] if user else '?' }}</div>
           <div class="user-info">
             <span class="user-name">{{ user.full_name if user else '' }}</span>
             <span class="user-role">{{ user.role | capitalize if user else '' }}</span>
           </div>
-        </div>
+        </a>
         <a href="/logout" class="logout-btn" title="Sign out">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </a>
       </div>
     </aside>
 
-    <!-- Main content -->
+    <!-- Main -->
     <main class="main">
       <div class="main-inner">
         {% block content %}{% endblock %}
@@ -61,8 +76,13 @@
     </main>
   </div>
 
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- Modal overlay -->
   <div id="modal-overlay" class="modal-overlay hidden" onclick="closeAllModals()"></div>
 
   <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

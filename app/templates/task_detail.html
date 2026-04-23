@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }} — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <a href="/projects/{{ task.project_id }}" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      {{ task.project.name }}
+    </a>
+    <h1 class="page-title">{{ task.title }}</h1>
+  </div>
+  <div class="header-actions">
+    <span class="badge priority-{{ task.priority.value }} badge-lg">{{ task.priority.value | title }}</span>
+    <span class="badge status-{{ task.status.value }} badge-lg">{{ task.status.value | replace('_',' ') | title }}</span>
+    {% if user.role == 'admin' or task.created_by == user.id %}
+    <button class="btn btn-ghost" onclick="openModal('modal-edit-task')">Edit</button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="task-detail-grid">
+  <!-- Main content -->
+  <div class="task-detail-main">
+    <div class="card">
+      <h3 class="card-section-title">Description</h3>
+      {% if task.description %}
+      <p class="task-description">{{ task.description }}</p>
+      {% else %}
+      <p class="text-muted">No description provided.</p>
+      {% endif %}
+    </div>
+
+    <!-- Comments -->
+    <div class="card" style="margin-top:16px">
+      <h3 class="card-section-title">Comments ({{ task.comments | length }})</h3>
+      {% if task.comments %}
+      <div class="comments-list">
+        {% for c in task.comments %}
+        <div class="comment">
+          <div class="comment-avatar">{{ c.author.full_name[0] }}</div>
+          <div class="comment-body">
+            <div class="comment-header">
+              <span class="comment-author">{{ c.author.full_name }}</span>
+              <span class="comment-time">{{ c.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+              {% if c.user_id == user.id or user.role == 'admin' %}
+              <form method="POST" action="/tasks/{{ task.id }}/comment/{{ c.id }}/delete" style="margin-left:auto">
+                <button type="submit" class="btn-link-danger" onclick="return confirm('Delete this comment?')">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+            <p class="comment-content">{{ c.content }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted" style="margin-bottom:16px">No comments yet. Be the first!</p>
+      {% endif %}
+
+      <form method="POST" action="/tasks/{{ task.id }}/comment" class="comment-form">
+        <div class="comment-input-row">
+          <div class="comment-avatar you">{{ user.full_name[0] }}</div>
+          <div style="flex:1">
+            <textarea name="content" class="form-input" rows="3" placeholder="Add a comment…" required></textarea>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button type="submit" class="btn btn-primary btn-sm">Post Comment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="task-detail-sidebar">
+    <div class="card">
+      <div class="task-meta-group">
+        <div class="task-meta-item">
+          <span class="task-meta-label">Status</span>
+          <span class="badge status-{{ task.status.value }}">{{ task.status.value | replace('_',' ') | title }}</span>
+        </div>
+        <div class="task-meta-item">
+          <span class="task-meta-label">Priority</span>
+          <span class="badge priority-{{ task.priority.value }}">{{ task.priority.value | title }}</span>
+        </div>
+        <div class="task-meta-item">
+          <span class="task-meta-label">Assigned To</span>
+          {% if task.assignee %}
+          <div class="assignee-chip">
+            <div class="avatar-xs">{{ task.assignee.full_name[0] }}</div>
+            <span>{{ task.assignee.full_name }}</span>
+          </div>
+          {% else %}<span class="text-muted">Unassigned</span>{% endif %}
+        </div>
+        <div class="task-meta-item">
+          <span class="task-meta-label">Created By</span>
+          <span>{{ task.creator.full_name }}</span>
+        </div>
+        <div class="task-meta-item">
+          <span class="task-meta-label">Due Date</span>
+          {% if task.due_date %}
+          <span class="{% if task.due_date < now and task.status.value != 'done' %}text-red{% endif %}">
+            {{ task.due_date.strftime('%d %b %Y') }}
+            {% if task.due_date < now and task.status.value != 'done' %} ⚠ Overdue{% endif %}
+          </span>
+          {% else %}<span class="text-muted">No due date</span>{% endif %}
+        </div>
+        <div class="task-meta-item">
+          <span class="task-meta-label">Project</span>
+          <a href="/projects/{{ task.project_id }}" class="link-blue">{{ task.project.name }}</a>
+        </div>
+        <div class="task-meta-item">
+          <span class="task-meta-label">Created</span>
+          <span>{{ task.created_at.strftime('%d %b %Y') }}</span>
+        </div>
+        <div class="task-meta-item">
+          <span class="task-meta-label">Last Updated</span>
+          <span>{{ task.updated_at.strftime('%d %b %Y, %H:%M') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick status change -->
+    <div class="card" style="margin-top:12px">
+      <h4 class="card-section-title">Quick Update</h4>
+      <form method="POST" action="/tasks/{{ task.id }}/update">
+        <div class="form-group">
+          <select name="status" class="form-input form-input-sm">
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if s == task.status.value %}selected{% endif %}>{{ s | replace('_',' ') | title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <select name="assigned_to" class="form-input form-input-sm">
+            <option value="0">Unassigned</option>
+            {% for m in members %}
+            <option value="{{ m.id }}" {% if task.assigned_to == m.id %}selected{% endif %}>{{ m.full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm btn-full">Update</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Task Modal -->
+{% if user.role == 'admin' or task.created_by == user.id %}
+<div id="modal-edit-task" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">Edit Task</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+  <form method="POST" action="/tasks/{{ task.id }}/edit">
+    <div class="form-group">
+      <label class="form-label">Title <span class="required">*</span></label>
+      <input type="text" name="title" class="form-input" value="{{ task.title }}" required />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-input" rows="4">{{ task.description or '' }}</textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-input">
+          {% for s in statuses %}<option value="{{ s }}" {% if s == task.status.value %}selected{% endif %}>{{ s | replace('_',' ') | title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select name="priority" class="form-input">
+          {% for p in priorities %}<option value="{{ p }}" {% if p == task.priority.value %}selected{% endif %}>{{ p | title }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Assign To</label>
+        <select name="assigned_to" class="form-input">
+          <option value="">Unassigned</option>
+          {% for m in members %}<option value="{{ m.id }}" {% if task.assigned_to == m.id %}selected{% endif %}>{{ m.full_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input type="date" name="due_date" class="form-input" value="{{ task.due_date.strftime('%Y-%m-%d') if task.due_date else '' }}" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}
