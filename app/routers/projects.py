@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Project, ProjectMember, Task, User, ProjectStatus, TaskStatus, TaskPriority, ActivityLog
+from app.models import Project, ProjectMember, Task, User, ProjectStatus, TaskStatus, TaskPriority, ActivityLog, Tag, TaskTag
 from app.auth import require_login, require_admin
 
 router = APIRouter()
@@ -220,9 +220,10 @@ async def project_detail(project_id: int, request: Request, db: Session = Depend
     non_members = [u for u in all_users if u not in members]
     activities = db.query(ActivityLog).filter(ActivityLog.project_id == project_id).order_by(ActivityLog.created_at.desc()).limit(15).all()
 
-    status_filter = request.query_params.get("status", "")
+    status_filter   = request.query_params.get("status", "")
     priority_filter = request.query_params.get("priority", "")
     assignee_filter = request.query_params.get("assignee", "")
+    tag_filter      = request.query_params.get("tag", "")
 
     filtered_tasks = tasks
     if status_filter:
@@ -234,10 +235,16 @@ async def project_detail(project_id: int, request: Request, db: Session = Depend
             filtered_tasks = [t for t in filtered_tasks if t.assigned_to == user["id"]]
         elif assignee_filter == "unassigned":
             filtered_tasks = [t for t in filtered_tasks if not t.assigned_to]
+    if tag_filter:
+        try:
+            tag_id = int(tag_filter)
+            filtered_tasks = [t for t in filtered_tasks if any(tt.tag_id == tag_id for tt in t.task_tags)]
+        except ValueError:
+            pass
 
-    todo_tasks = [t for t in filtered_tasks if t.status == TaskStatus.todo]
+    todo_tasks      = [t for t in filtered_tasks if t.status == TaskStatus.todo]
     inprogress_tasks = [t for t in filtered_tasks if t.status == TaskStatus.in_progress]
-    done_tasks = [t for t in filtered_tasks if t.status == TaskStatus.done]
+    done_tasks      = [t for t in filtered_tasks if t.status == TaskStatus.done]
 
     return templates.TemplateResponse("project_detail.html", {
         "request": request, "user": user, "project": project,
@@ -250,7 +257,8 @@ async def project_detail(project_id: int, request: Request, db: Session = Depend
         "activities": activities,
         "stats": _project_stats(project),
         "now": datetime.utcnow(),
-        "status_filter": status_filter, "priority_filter": priority_filter, "assignee_filter": assignee_filter,
+        "status_filter": status_filter, "priority_filter": priority_filter,
+        "assignee_filter": assignee_filter, "tag_filter": tag_filter,
     })
 
 

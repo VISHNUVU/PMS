@@ -121,6 +121,28 @@ function openResetModal(userId, userName) {
   openModal('modal-reset-pw');
 }
 
+// ── Mobile sidebar ───────────────────────────────────────────
+function toggleSidebar() {
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const burger   = document.getElementById('hamburger');
+  const open     = sidebar.classList.toggle('open');
+  burger.classList.toggle('open', open);
+  if (backdrop) backdrop.classList.toggle('hidden', !open);
+}
+
+// Close sidebar on nav-item click (mobile)
+document.addEventListener('click', e => {
+  if (window.innerWidth <= 768 && e.target.closest('.nav-item')) {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const burger = document.getElementById('hamburger');
+    if (sidebar) sidebar.classList.remove('open');
+    if (backdrop) backdrop.classList.add('hidden');
+    if (burger) burger.classList.remove('open');
+  }
+});
+
 // ── Dark Mode ─────────────────────────────────────────────────
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);

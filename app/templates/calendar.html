@@ -15,7 +15,6 @@
   </div>
 </div>
 
-<!-- Legend -->
 <div class="cal-legend">
   <span class="cal-legend-item"><span class="cal-dot priority-high"></span> High</span>
   <span class="cal-legend-item"><span class="cal-dot priority-medium"></span> Medium</span>
@@ -23,8 +22,17 @@
   <span class="cal-legend-item"><span class="cal-dot status-done"></span> Done</span>
 </div>
 
-<!-- Calendar grid rendered by JS -->
 <div class="calendar-grid" id="calendar-grid"></div>
+
+<!-- Day popover -->
+<div id="cal-popover" class="cal-popover hidden">
+  <div class="cal-popover-header">
+    <span id="cal-popover-date"></span>
+    <button onclick="closeCalPopover()" class="cal-popover-close">&times;</button>
+  </div>
+  <div id="cal-popover-list"></div>
+</div>
+<div id="cal-popover-overlay" class="hidden" onclick="closeCalPopover()" style="position:fixed;inset:0;z-index:199"></div>
 
 {% endblock %}
 {% block scripts %}
@@ -43,13 +51,10 @@ function init() {
 }
 
 function render() {
-  const label = document.getElementById('month-label');
-  label.textContent = MONTHS[currentMonth] + ' ' + currentYear;
-
+  document.getElementById('month-label').textContent = MONTHS[currentMonth] + ' ' + currentYear;
   const grid = document.getElementById('calendar-grid');
   grid.innerHTML = '';
 
-  // Day headers
   DAYS.forEach(d => {
     const h = document.createElement('div');
     h.className = 'cal-day-header';
@@ -57,23 +62,23 @@ function render() {
     grid.appendChild(h);
   });
 
-  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const firstDay    = new Date(currentYear, currentMonth, 1).getDay();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const today = new Date();
+  const today       = new Date();
+  const MAX_VISIBLE = 3;
 
-  // Blank cells
   for (let i = 0; i < firstDay; i++) {
     const blank = document.createElement('div');
     blank.className = 'cal-cell cal-cell-empty';
     grid.appendChild(blank);
   }
 
-  // Day cells
   for (let day = 1; day <= daysInMonth; day++) {
-    const cell = document.createElement('div');
-    const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const isToday = today.getFullYear()===currentYear && today.getMonth()===currentMonth && today.getDate()===day;
+    const dateStr  = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday  = today.getFullYear()===currentYear && today.getMonth()===currentMonth && today.getDate()===day;
+    const dayEvts  = EVENTS.filter(e => e.due === dateStr);
 
+    const cell = document.createElement('div');
     cell.className = 'cal-cell' + (isToday ? ' cal-today' : '');
 
     const num = document.createElement('div');
@@ -81,21 +86,20 @@ function render() {
     num.textContent = day;
     cell.appendChild(num);
 
-    // Events for this day
-    const dayEvents = EVENTS.filter(e => e.due === dateStr);
-    const maxVisible = 3;
-    dayEvents.slice(0, maxVisible).forEach(ev => {
+    dayEvts.slice(0, MAX_VISIBLE).forEach(ev => {
       const chip = document.createElement('a');
       chip.href = `/tasks/${ev.id}`;
-      chip.className = `cal-event cal-event-${ev.priority} ${ev.status === 'done' ? 'cal-event-done' : ''}`;
-      chip.title = `${ev.title} — ${ev.project}`;
-      chip.textContent = ev.title;
+      chip.className = `cal-event cal-event-${ev.priority}${ev.status==='done' ? ' cal-event-done' : ''}`;
+      chip.title = `#${ev.id} ${ev.title} — ${ev.project}`;
+      chip.textContent = `#${ev.id} ${ev.title}`;
       cell.appendChild(chip);
     });
-    if (dayEvents.length > maxVisible) {
-      const more = document.createElement('div');
-      more.className = 'cal-more';
-      more.textContent = `+${dayEvents.length - maxVisible} more`;
+
+    if (dayEvts.length > MAX_VISIBLE) {
+      const more = document.createElement('button');
+      more.className = 'cal-more-btn';
+      more.textContent = `+${dayEvts.length - MAX_VISIBLE} more`;
+      more.onclick = (e) => { e.stopPropagation(); openCalPopover(dateStr, dayEvts, more); };
       cell.appendChild(more);
     }
 
@@ -103,14 +107,41 @@ function render() {
   }
 }
 
+function openCalPopover(dateStr, evts, anchor) {
+  const pop = document.getElementById('cal-popover');
+  const overlay = document.getElementById('cal-popover-overlay');
+  document.getElementById('cal-popover-date').textContent = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+
+  const list = document.getElementById('cal-popover-list');
+  list.innerHTML = '';
+  evts.forEach(ev => {
+    const a = document.createElement('a');
+    a.href = `/tasks/${ev.id}`;
+    a.className = `cal-popover-item cal-event-${ev.priority}${ev.status==='done'?' cal-event-done':''}`;
+    a.innerHTML = `<span class="cal-pop-id">#${ev.id}</span><span class="cal-pop-title">${ev.title}</span><span class="cal-pop-proj">${ev.project}</span>`;
+    list.appendChild(a);
+  });
+
+  // Position near anchor
+  const rect = anchor.getBoundingClientRect();
+  pop.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
+  pop.style.left = Math.min(rect.left, window.innerWidth - 300) + 'px';
+
+  pop.classList.remove('hidden');
+  overlay.classList.remove('hidden');
+}
+
+function closeCalPopover() {
+  document.getElementById('cal-popover').classList.add('hidden');
+  document.getElementById('cal-popover-overlay').classList.add('hidden');
+}
+
 document.getElementById('btn-prev').addEventListener('click', () => {
-  currentMonth--;
-  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  if (--currentMonth < 0) { currentMonth = 11; currentYear--; }
   render();
 });
 document.getElementById('btn-next').addEventListener('click', () => {
-  currentMonth++;
-  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (++currentMonth > 11) { currentMonth = 0; currentYear++; }
   render();
 });
 document.getElementById('btn-today').addEventListener('click', () => {

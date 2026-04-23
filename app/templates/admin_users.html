@@ -5,9 +5,15 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Members</h1>
-    <p class="page-subtitle">{{ users | length }} total user{% if users | length != 1 %}s{% endif %}</p>
+    <p class="page-subtitle" id="member-count">{{ users | length }} total user{% if users | length != 1 %}s{% endif %}</p>
   </div>
-  <button class="btn btn-primary" onclick="openModal('modal-create-user')">+ Add Member</button>
+  <div class="header-actions">
+    <div class="member-search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="member-search" class="form-input form-input-sm" placeholder="Search members…" oninput="filterMembers(this.value)" autocomplete="off" />
+    </div>
+    <button class="btn btn-primary" onclick="openModal('modal-create-user')">+ Add Member</button>
+  </div>
 </div>
 
 {% if error %}
@@ -28,7 +34,7 @@
     </thead>
     <tbody>
       {% for u in users %}
-      <tr class="{% if not u.is_active %}row-inactive{% endif %}">
+      <tr class="{% if not u.is_active %}row-inactive{% endif %} member-row" data-name="{{ u.full_name | lower }} {{ u.username | lower }} {{ u.email | lower }}">
         <td>
           <div class="table-user">
             <div class="avatar-circle sm">{{ u.full_name[0] | upper }}</div>
@@ -125,4 +131,20 @@
   </form>
 </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+function filterMembers(q) {
+  const rows = document.querySelectorAll('.member-row');
+  const term = q.toLowerCase().trim();
+  let visible = 0;
+  rows.forEach(row => {
+    const match = !term || row.dataset.name.includes(term);
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  const count = document.getElementById('member-count');
+  if (count) count.textContent = visible + ' user' + (visible !== 1 ? 's' : '') + (term ? ' matching' : ' total');
+}
+</script>
 {% endblock %}
