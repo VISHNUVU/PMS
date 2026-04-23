@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Calendar — EBS PMS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Calendar</h1>
+    <p class="page-subtitle">Tasks by due date</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" id="btn-prev">← Prev</button>
+    <span class="calendar-month-label" id="month-label"></span>
+    <button class="btn btn-ghost" id="btn-next">Next →</button>
+    <button class="btn btn-ghost btn-sm" id="btn-today">Today</button>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="cal-legend">
+  <span class="cal-legend-item"><span class="cal-dot priority-high"></span> High</span>
+  <span class="cal-legend-item"><span class="cal-dot priority-medium"></span> Medium</span>
+  <span class="cal-legend-item"><span class="cal-dot priority-low"></span> Low</span>
+  <span class="cal-legend-item"><span class="cal-dot status-done"></span> Done</span>
+</div>
+
+<!-- Calendar grid rendered by JS -->
+<div class="calendar-grid" id="calendar-grid"></div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const EVENTS = {{ events | tojson }};
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+let currentYear, currentMonth;
+
+function init() {
+  const now = new Date();
+  currentYear  = now.getFullYear();
+  currentMonth = now.getMonth();
+  render();
+}
+
+function render() {
+  const label = document.getElementById('month-label');
+  label.textContent = MONTHS[currentMonth] + ' ' + currentYear;
+
+  const grid = document.getElementById('calendar-grid');
+  grid.innerHTML = '';
+
+  // Day headers
+  DAYS.forEach(d => {
+    const h = document.createElement('div');
+    h.className = 'cal-day-header';
+    h.textContent = d;
+    grid.appendChild(h);
+  });
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const today = new Date();
+
+  // Blank cells
+  for (let i = 0; i < firstDay; i++) {
+    const blank = document.createElement('div');
+    blank.className = 'cal-cell cal-cell-empty';
+    grid.appendChild(blank);
+  }
+
+  // Day cells
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cell = document.createElement('div');
+    const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday = today.getFullYear()===currentYear && today.getMonth()===currentMonth && today.getDate()===day;
+
+    cell.className = 'cal-cell' + (isToday ? ' cal-today' : '');
+
+    const num = document.createElement('div');
+    num.className = 'cal-day-num';
+    num.textContent = day;
+    cell.appendChild(num);
+
+    // Events for this day
+    const dayEvents = EVENTS.filter(e => e.due === dateStr);
+    const maxVisible = 3;
+    dayEvents.slice(0, maxVisible).forEach(ev => {
+      const chip = document.createElement('a');
+      chip.href = `/tasks/${ev.id}`;
+      chip.className = `cal-event cal-event-${ev.priority} ${ev.status === 'done' ? 'cal-event-done' : ''}`;
+      chip.title = `${ev.title} — ${ev.project}`;
+      chip.textContent = ev.title;
+      cell.appendChild(chip);
+    });
+    if (dayEvents.length > maxVisible) {
+      const more = document.createElement('div');
+      more.className = 'cal-more';
+      more.textContent = `+${dayEvents.length - maxVisible} more`;
+      cell.appendChild(more);
+    }
+
+    grid.appendChild(cell);
+  }
+}
+
+document.getElementById('btn-prev').addEventListener('click', () => {
+  currentMonth--;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  render();
+});
+document.getElementById('btn-next').addEventListener('click', () => {
+  currentMonth++;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  render();
+});
+document.getElementById('btn-today').addEventListener('click', () => {
+  const now = new Date();
+  currentYear  = now.getFullYear();
+  currentMonth = now.getMonth();
+  render();
+});
+
+init();
+</script>
+{% endblock %}

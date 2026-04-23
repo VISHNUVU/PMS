@@ -46,6 +46,7 @@ class User(Base):
     created_tasks = relationship("Task", foreign_keys="Task.created_by", back_populates="creator")
     comments = relationship("TaskComment", back_populates="author")
     activities = relationship("ActivityLog", back_populates="user")
+    uploaded_attachments = relationship("TaskAttachment", back_populates="uploader")
 
 
 class Project(Base):
@@ -64,6 +65,7 @@ class Project(Base):
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     activities = relationship("ActivityLog", back_populates="project", cascade="all, delete-orphan")
+    tags = relationship("Tag", back_populates="project", cascade="all, delete-orphan")
 
 
 class ProjectMember(Base):
@@ -98,6 +100,9 @@ class Task(Base):
     assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_tasks")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_tasks")
     comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan", order_by="TaskComment.created_at")
+    task_tags = relationship("TaskTag", back_populates="task", cascade="all, delete-orphan")
+    checklist_items = relationship("ChecklistItem", back_populates="task", cascade="all, delete-orphan", order_by="ChecklistItem.position")
+    attachments = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan")
 
 
 class TaskComment(Base):
@@ -111,6 +116,59 @@ class TaskComment(Base):
 
     task = relationship("Task", back_populates="comments")
     author = relationship("User", back_populates="comments")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False)
+    color = Column(String(20), default="blue")  # blue, green, red, orange, purple, pink, gray
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project", back_populates="tags")
+    task_tags = relationship("TaskTag", back_populates="tag", cascade="all, delete-orphan")
+
+
+class TaskTag(Base):
+    __tablename__ = "task_tags"
+    __table_args__ = (UniqueConstraint("task_id", "tag_id", name="uq_task_tag"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    tag_id = Column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False)
+
+    task = relationship("Task", back_populates="task_tags")
+    tag = relationship("Tag", back_populates="task_tags")
+
+
+class ChecklistItem(Base):
+    __tablename__ = "checklist_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    text = Column(String(300), nullable=False)
+    is_done = Column(Boolean, default=False)
+    position = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    task = relationship("Task", back_populates="checklist_items")
+
+
+class TaskAttachment(Base):
+    __tablename__ = "task_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    filename = Column(String(255), nullable=False)       # stored on disk (uuid-based)
+    original_name = Column(String(255), nullable=False)  # original upload name
+    file_size = Column(Integer)                          # bytes
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    task = relationship("Task", back_populates="attachments")
+    uploader = relationship("User", back_populates="uploaded_attachments")
 
 
 class ActivityLog(Base):

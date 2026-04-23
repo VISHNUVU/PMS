@@ -9,6 +9,33 @@
       {{ task.project.name }}
     </a>
     <h1 class="page-title">{{ task.title }}</h1>
+    <!-- Tags under title -->
+    <div class="task-title-tags">
+      {% for tt in task.task_tags %}
+      <span class="tag-pill tag-{{ tt.tag.color }}">{{ tt.tag.name }}
+        <form method="POST" action="/tasks/{{ task.id }}/tags/{{ tt.tag.id }}/remove" style="display:inline">
+          <button type="submit" class="tag-remove-btn" title="Remove tag">×</button>
+        </form>
+      </span>
+      {% endfor %}
+      {% if project_tags %}
+      <div class="dropdown tag-add-dropdown" id="tag-add-dd">
+        <button class="btn btn-ghost btn-xs" onclick="toggleDropdown('tag-add-dd')">+ Tag</button>
+        <div class="dropdown-menu">
+          {% for tag in project_tags %}
+          {% if tag.id not in task_tag_ids %}
+          <form method="POST" action="/tasks/{{ task.id }}/tags/add">
+            <input type="hidden" name="tag_id" value="{{ tag.id }}" />
+            <button type="submit" class="dropdown-item" style="width:100%;text-align:left;background:none;border:none;cursor:pointer">
+              <span class="tag-pill tag-{{ tag.color }} tag-sm">{{ tag.name }}</span>
+            </button>
+          </form>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
   </div>
   <div class="header-actions">
     <span class="badge priority-{{ task.priority.value }} badge-lg">{{ task.priority.value | title }}</span>
@@ -22,6 +49,8 @@
 <div class="task-detail-grid">
   <!-- Main content -->
   <div class="task-detail-main">
+
+    <!-- Description -->
     <div class="card">
       <h3 class="card-section-title">Description</h3>
       {% if task.description %}
@@ -29,6 +58,95 @@
       {% else %}
       <p class="text-muted">No description provided.</p>
       {% endif %}
+    </div>
+
+    <!-- Checklist -->
+    <div class="card" style="margin-top:16px">
+      {% set done_count = task.checklist_items | selectattr('is_done') | list | length %}
+      {% set total_count = task.checklist_items | length %}
+      <div class="card-section-header">
+        <h3 class="card-section-title">
+          Checklist
+          {% if total_count > 0 %}
+          <span class="checklist-count">{{ done_count }}/{{ total_count }}</span>
+          {% endif %}
+        </h3>
+      </div>
+
+      {% if total_count > 0 %}
+      <div class="checklist-progress-bar" style="margin-bottom:12px">
+        <div class="checklist-progress-fill" style="width:{{ (done_count / total_count * 100)|int }}%"></div>
+      </div>
+      <ul class="checklist-list">
+        {% for item in task.checklist_items %}
+        <li class="checklist-item {% if item.is_done %}is-done{% endif %}" data-item-id="{{ item.id }}">
+          <button class="checklist-checkbox" onclick="toggleChecklistItem({{ task.id }}, {{ item.id }}, this)" title="Toggle">
+            {% if item.is_done %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {% endif %}
+          </button>
+          <span class="checklist-text">{{ item.text }}</span>
+          <form method="POST" action="/tasks/{{ task.id }}/checklist/{{ item.id }}/delete" style="margin-left:auto">
+            <button type="submit" class="checklist-delete-btn" title="Delete item">×</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted" style="margin-bottom:12px">No checklist items yet.</p>
+      {% endif %}
+
+      <form method="POST" action="/tasks/{{ task.id }}/checklist/add" class="checklist-add-form">
+        <input type="text" name="text" class="form-input form-input-sm" placeholder="Add checklist item…" required />
+        <button type="submit" class="btn btn-primary btn-sm">Add</button>
+      </form>
+    </div>
+
+    <!-- Attachments -->
+    <div class="card" style="margin-top:16px">
+      <h3 class="card-section-title">Attachments ({{ task.attachments | length }})</h3>
+
+      {% if task.attachments %}
+      <div class="attachment-list">
+        {% for att in task.attachments %}
+        <div class="attachment-row">
+          <div class="attachment-icon">
+            {% set ext = att.original_name.rsplit('.', 1)[-1].lower() if '.' in att.original_name else '' %}
+            {% if ext in ['jpg','jpeg','png','gif','webp'] %}🖼️
+            {% elif ext in ['pdf'] %}📄
+            {% elif ext in ['doc','docx'] %}📝
+            {% elif ext in ['xls','xlsx','csv'] %}📊
+            {% elif ext in ['zip','rar','7z'] %}🗜️
+            {% else %}📎{% endif %}
+          </div>
+          <div class="attachment-info">
+            <a href="/static/uploads/{{ att.filename }}" target="_blank" class="attachment-name">{{ att.original_name }}</a>
+            <span class="attachment-meta">
+              {{ (att.file_size / 1024) | int }} KB · {{ att.uploader.full_name }} · {{ att.created_at.strftime('%d %b %Y') }}
+            </span>
+          </div>
+          {% if user.role == 'admin' or att.uploaded_by == user.id %}
+          <form method="POST" action="/tasks/{{ task.id }}/attachments/{{ att.id }}/delete">
+            <button type="submit" class="btn btn-ghost btn-xs text-red" onclick="return confirm('Delete this attachment?')">Delete</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted" style="margin-bottom:12px">No attachments yet.</p>
+      {% endif %}
+
+      <form method="POST" action="/tasks/{{ task.id }}/attachments/upload" enctype="multipart/form-data" class="attachment-upload-form">
+        <label class="upload-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Choose file</span>
+          <input type="file" name="file" required onchange="this.nextElementSibling.nextElementSibling.textContent = this.files[0]?.name || 'Choose file'" style="display:none"/>
+          <span class="upload-filename"></span>
+        </label>
+        <button type="submit" class="btn btn-ghost btn-sm">Upload</button>
+      </form>
+      <p class="text-muted" style="font-size:12px;margin-top:4px">Max 10 MB per file.</p>
     </div>
 
     <!-- Comments -->
@@ -197,4 +315,43 @@
 </div>
 {% endif %}
 
+{% endblock %}
+{% block scripts %}
+<script>
+async function toggleChecklistItem(taskId, itemId, btn) {
+  try {
+    const res = await fetch(`/tasks/${taskId}/checklist/${itemId}/toggle`, { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      const li = btn.closest('.checklist-item');
+      if (data.is_done) {
+        li.classList.add('is-done');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      } else {
+        li.classList.remove('is-done');
+        btn.innerHTML = '';
+      }
+      // Update progress bar
+      const list = document.querySelectorAll('.checklist-item');
+      const doneCount = document.querySelectorAll('.checklist-item.is-done').length;
+      const total = list.length;
+      const fill = document.querySelector('.checklist-progress-fill');
+      if (fill) fill.style.width = (total ? Math.round(doneCount/total*100) : 0) + '%';
+      const counter = document.querySelector('.checklist-count');
+      if (counter) counter.textContent = doneCount + '/' + total;
+    }
+  } catch(e) { showToast('Failed to update', 'error'); }
+}
+
+// File upload label
+document.addEventListener('DOMContentLoaded', () => {
+  const fileInput = document.querySelector('.upload-label input[type=file]');
+  if (fileInput) {
+    fileInput.addEventListener('change', function() {
+      const label = this.closest('.upload-label').querySelector('.upload-filename');
+      if (label) label.textContent = this.files[0]?.name || '';
+    });
+  }
+});
+</script>
 {% endblock %}

@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Task, TaskComment, TaskPriority, TaskStatus, ProjectMember, ActivityLog
+from app.models import Task, TaskComment, TaskPriority, TaskStatus, ProjectMember, ActivityLog, Tag, TaskTag
 from app.auth import require_login
 
 router = APIRouter()
@@ -30,6 +30,8 @@ async def task_detail(task_id: int, request: Request, db: Session = Depends(get_
 
     from app.models import User, ProjectMember as PM
     members = db.query(User).join(PM, PM.user_id == User.id).filter(PM.project_id == task.project_id).all()
+    project_tags = db.query(Tag).filter(Tag.project_id == task.project_id).all()
+    task_tag_ids = [tt.tag_id for tt in task.task_tags]
 
     return templates.TemplateResponse("task_detail.html", {
         "request": request, "user": user, "task": task,
@@ -37,6 +39,8 @@ async def task_detail(task_id: int, request: Request, db: Session = Depends(get_
         "priorities": [p.value for p in TaskPriority],
         "statuses": [s.value for s in TaskStatus],
         "now": datetime.utcnow(),
+        "project_tags": project_tags,
+        "task_tag_ids": task_tag_ids,
     })
 
 

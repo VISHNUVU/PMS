@@ -7,11 +7,15 @@ from app.database import engine, SessionLocal
 from app.models import Base, User, UserRole
 from app.auth import hash_password
 from app.routers import auth_router, projects, admin
-from app.routers import tasks_detail, my_tasks, profile, reports, search
+from app.routers import tasks_detail, my_tasks, profile, reports, search, extras
 
 app = FastAPI(title="EBS Project Management System", docs_url=None, redoc_url=None)
 
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "fallback-secret"))
+
+# Ensure upload directory exists before mounting
+os.makedirs("app/static/uploads", exist_ok=True)
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.include_router(auth_router.router)
@@ -22,6 +26,7 @@ app.include_router(my_tasks.router)
 app.include_router(profile.router)
 app.include_router(reports.router)
 app.include_router(search.router)
+app.include_router(extras.router)
 
 
 @app.on_event("startup")

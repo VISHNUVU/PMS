@@ -12,6 +12,7 @@
   </div>
   <div class="header-actions">
     <span class="badge status-{{ project.status.value }} badge-lg">{{ project.status.value | title }}</span>
+    <a href="/projects/{{ project.id }}/export.csv" class="btn btn-ghost btn-sm" title="Export tasks as CSV">⬇ CSV</a>
     <button class="btn btn-primary" onclick="openModal('modal-create-task')">+ Add Task</button>
     {% if user.role == 'admin' %}
     <div class="dropdown" id="proj-dropdown">
@@ -19,6 +20,7 @@
       <div class="dropdown-menu">
         <a class="dropdown-item" onclick="openModal('modal-edit-project')">Edit Project</a>
         <a class="dropdown-item" onclick="openModal('modal-project-status')">Change Status</a>
+        <a class="dropdown-item" onclick="openModal('modal-manage-tags')">Manage Tags</a>
         <a class="dropdown-item text-red" onclick="confirmDelete()">Delete Project</a>
       </div>
     </div>
@@ -63,6 +65,15 @@
   </div>
   {% if user.role == 'admin' and non_members %}
   <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-member')">+ Member</button>
+  {% endif %}
+
+  <!-- Project Tags display -->
+  {% if project.tags %}
+  <div class="project-tags-strip">
+    {% for tag in project.tags %}
+    <span class="tag-pill tag-{{ tag.color }}">{{ tag.name }}</span>
+    {% endfor %}
+  </div>
   {% endif %}
 </div>
 
@@ -114,8 +125,30 @@
             </button>
           </div>
         </div>
+
+        <!-- Tags on card -->
+        {% if t.task_tags %}
+        <div class="card-tags">
+          {% for tt in t.task_tags %}
+          <span class="tag-pill tag-{{ tt.tag.color }} tag-sm">{{ tt.tag.name }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
         <h4 class="task-card-title">{{ t.title }}</h4>
         {% if t.description %}<p class="task-card-desc">{{ t.description }}</p>{% endif %}
+
+        <!-- Checklist progress on card -->
+        {% if t.checklist_items %}
+        {% set done_items = t.checklist_items | selectattr('is_done') | list %}
+        <div class="checklist-mini">
+          <div class="checklist-mini-bar">
+            <div class="checklist-mini-fill" style="width:{{ (done_items|length / t.checklist_items|length * 100)|int }}%"></div>
+          </div>
+          <span class="checklist-mini-label">{{ done_items|length }}/{{ t.checklist_items|length }}</span>
+        </div>
+        {% endif %}
+
         <div class="task-card-footer">
           {% if t.assignee %}
           <div class="assignee-chip">
@@ -126,6 +159,9 @@
           <div class="task-card-meta-right">
             {% if t.comments | length > 0 %}
             <span class="comment-count">💬 {{ t.comments | length }}</span>
+            {% endif %}
+            {% if t.attachments | length > 0 %}
+            <span class="comment-count">📎 {{ t.attachments | length }}</span>
             {% endif %}
             {% if t.due_date %}
             <span class="due-chip {% if t.due_date < now and t.status.value != 'done' %}overdue{% endif %}">
@@ -202,6 +238,8 @@
   </div>
 </div>
 {% endif %}
+
+<!-- ── MODALS ─────────────────────────────────────────────── -->
 
 <!-- Create Task Modal -->
 <div id="modal-create-task" class="modal hidden">
@@ -315,6 +353,56 @@
   </form>
 </div>
 
+<!-- Manage Tags Modal -->
+<div id="modal-manage-tags" class="modal hidden">
+  <div class="modal-header">
+    <h2 class="modal-title">Manage Tags</h2>
+    <button class="modal-close" onclick="closeAllModals()">&times;</button>
+  </div>
+
+  <!-- Existing tags -->
+  {% if project.tags %}
+  <div class="tag-list-manage" style="margin-bottom:16px">
+    {% for tag in project.tags %}
+    <div class="tag-manage-row">
+      <span class="tag-pill tag-{{ tag.color }}">{{ tag.name }}</span>
+      <form method="POST" action="/projects/{{ project.id }}/tags/{{ tag.id }}/delete" style="margin-left:auto">
+        <button type="submit" class="btn-link-danger btn-sm" onclick="return confirm('Delete tag \'{{ tag.name }}\'?')">Remove</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted" style="margin-bottom:16px">No tags yet. Create one below.</p>
+  {% endif %}
+
+  <!-- Create new tag -->
+  <form method="POST" action="/projects/{{ project.id }}/tags/create">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Tag Name</label>
+        <input type="text" name="name" class="form-input" placeholder="e.g. Bug, Feature, Review…" required />
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Color</label>
+        <select name="color" class="form-input">
+          <option value="blue">Blue</option>
+          <option value="green">Green</option>
+          <option value="red">Red</option>
+          <option value="orange">Orange</option>
+          <option value="purple">Purple</option>
+          <option value="pink">Pink</option>
+          <option value="gray">Gray</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="closeAllModals()">Close</button>
+      <button type="submit" class="btn btn-primary">Create Tag</button>
+    </div>
+  </form>
+</div>
+
 <!-- Delete form (hidden) -->
 <form id="delete-project-form" method="POST" action="/projects/{{ project.id }}/delete" style="display:none"></form>
 {% endif %}
@@ -334,14 +422,5 @@ function confirmDelete() {
     document.getElementById('delete-project-form').submit();
   }
 }
-function toggleDropdown(id) {
-  const el = document.getElementById(id);
-  el.classList.toggle('open');
-}
-document.addEventListener('click', e => {
-  document.querySelectorAll('.dropdown.open').forEach(d => {
-    if (!d.contains(e.target)) d.classList.remove('open');
-  });
-});
 </script>
 {% endblock %}

@@ -1,4 +1,4 @@
-// ── Modal helpers ─────────────────────────────────────────────────
+// ── Modal helpers ─────────────────────────────────────────────
 function openModal(id) {
   const m = document.getElementById(id);
   if (!m) return;
@@ -18,7 +18,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeAllModals(); closeAllTaskEdits(); }
 });
 
-// ── Task inline edit ──────────────────────────────────────────────
+// ── Task inline edit ──────────────────────────────────────────
 function openTaskEdit(id) {
   closeAllTaskEdits();
   const el = document.getElementById('task-edit-' + id);
@@ -39,7 +39,7 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.task-card')) closeAllTaskEdits();
 });
 
-// ── Drag & Drop Kanban ────────────────────────────────────────────
+// ── Drag & Drop Kanban ────────────────────────────────────────
 let draggedTaskId = null;
 
 function dragStart(event, taskId) {
@@ -81,7 +81,7 @@ async function dropTask(event, newStatus) {
   draggedTaskId = null;
 }
 
-// ── Toast notifications ───────────────────────────────────────────
+// ── Toast notifications ───────────────────────────────────────
 function showToast(msg, type = '') {
   const container = document.getElementById('toast-container');
   if (!container) return;
@@ -100,7 +100,7 @@ function showToast(msg, type = '') {
   }, 3500);
 }
 
-// ── Dropdown ──────────────────────────────────────────────────────
+// ── Dropdown ──────────────────────────────────────────────────
 function toggleDropdown(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('open');
@@ -112,7 +112,7 @@ document.addEventListener('click', e => {
   }
 });
 
-// ── Admin reset password modal ────────────────────────────────────
+// ── Admin reset password modal ────────────────────────────────
 function openResetModal(userId, userName) {
   const nameEl = document.getElementById('reset-user-name');
   const form   = document.getElementById('reset-pw-form');
@@ -121,7 +121,24 @@ function openResetModal(userId, userName) {
   openModal('modal-reset-pw');
 }
 
-// ── Auto-dismiss flash alerts ─────────────────────────────────────
+// ── Dark Mode ─────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('ebs-theme', theme);
+}
+
+function toggleDarkMode() {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+// Apply saved theme immediately (before DOMContentLoaded to avoid flash)
+(function() {
+  const saved = localStorage.getItem('ebs-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
+// ── Auto-dismiss flash alerts + toast from URL ────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const alerts = document.querySelectorAll('.alert');
   alerts.forEach(a => {
@@ -138,4 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const error   = params.get('error');
   if (success) showToast(decodeURIComponent(success.replace(/\+/g,' ')), 'success');
   if (error)   showToast(decodeURIComponent(error.replace(/\+/g,' ')), 'error');
+
+  // File upload label sync
+  document.querySelectorAll('.upload-label input[type=file]').forEach(input => {
+    input.addEventListener('change', function() {
+      const label = this.closest('.upload-label')?.querySelector('.upload-filename');
+      if (label) label.textContent = this.files[0]?.name || '';
+    });
+  });
 });
