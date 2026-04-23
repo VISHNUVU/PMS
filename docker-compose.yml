@@ -38,9 +38,11 @@ services:
       - ebs_pms_net
     volumes:
       - ./app:/app/app
+      - ebs_pms_uploads:/app/app/static/uploads
 
 volumes:
   ebs_pms_pgdata:
+  ebs_pms_uploads:
 
 networks:
   ebs_pms_net:
